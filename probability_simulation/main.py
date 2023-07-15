@@ -1,4 +1,5 @@
 import random
+import matplotlib.pyplot as plt
 
 
 class User:
@@ -22,6 +23,12 @@ class Simulation:
         self.map_claims = []
         self.num_iterations = num_iterations
         self.num_verifier_ratio = num_verifier_ratio
+        self.total_rewards_over_time = []
+        self.num_contributors_over_time = []
+        self.num_verifiers_over_time = []
+        self.num_flagged_over_time = []
+        self.num_demotions_over_time = []
+        self.num_demotions = 0
 
     def create_map_claim(self, user):
         map_claim = MapClaim(user.id)
@@ -33,7 +40,7 @@ class Simulation:
         if random.random() < 0.9:  # 90% chance of being valid
             map_claim.status = "verified"
         else:
-            map_claim.status = "invalid"
+            map_claim.status = "rejected"
 
     def verify_map_claim(self, verifier, map_claim):
         if map_claim.status == "verified":
@@ -43,10 +50,11 @@ class Simulation:
             else:
                 map_claim.status = "rejected"
 
-    def flag_verifier(self, user, verifier):
+    def flag_verifier(self, verifier):
         verifier.flags += 1
         if verifier.flags >= 4:
             verifier.role = "Contributor"
+            self.num_demotions += 1
 
     def challenge_flags(self, governance, flagged_verifier):
         if random.random() < 0.5:  # 50% chance of revoking flags
@@ -62,19 +70,23 @@ class Simulation:
             user = random.choice(self.users)
             map_claim = self.create_map_claim(user)
             self.auto_validate(map_claim)
+            verifier_candidates = [u for u in self.users if u.role == "Verifier"]
 
-            if map_claim.status == "verified":
-                verifier_candidates = [u for u in self.users if u.role == "Verifier"]
-                if verifier_candidates:
-                    verifier = random.choice(verifier_candidates)
-                    self.verify_map_claim(verifier, map_claim)
+            if map_claim.status == "verified" and verifier_candidates:
+                verifier = random.choice(verifier_candidates)
+                self.verify_map_claim(verifier, map_claim)
 
             if len([mc for mc in user.map_claims if mc.status == "rewarded"]) >= 5:
                 user.role = "Verifier"
 
-            if user.role == "Verifier" and random.random() < 0.1:  # 10% chance of being flagged
-                flagger = random.choice(self.users)
-                self.flag_verifier(flagger, user)
+            if user.role == "Verifier" and random.random() < 0.2:  # % chance of being flagged
+                self.flag_verifier(user)
+
+            self.total_rewards_over_time.append(len([mc for mc in self.map_claims if mc.status == "rewarded"]))
+            self.num_contributors_over_time.append(len([u for u in self.users if u.role == "Contributor"]))
+            self.num_verifiers_over_time.append(len([u for u in self.users if u.role == "Verifier"]))
+            self.num_flagged_over_time.append(len([u for u in self.users if u.flags > 0]))
+            self.num_demotions_over_time.append(self.num_demotions)
 
             # if random.random() < 0.05:  # 5% chance of a governance challenge
             #     governance = random.choice(self.users)
@@ -86,11 +98,11 @@ class Simulation:
                   f'{user.role} role, {user.flags} flags, '
                   f'{len([mc for mc in user.map_claims if mc.status == "verified"])} verified ,'
                   f'{len([mc for mc in user.map_claims if mc.status == "rejected"])} rejected ,'
-                  f'{len([mc for mc in user.map_claims if mc.status == "invalid"])} invalid ,'
                   f'{len([mc for mc in user.map_claims if mc.status == "rewarded"])} rewarded ')
 
         # print total amount of map_claims for all user with status rewarded:
-        print(f'Total amount of map_claims with status rewarded: {len([mc for mc in self.map_claims if mc.status == "rewarded"])}')
+        print(
+            f'Total amount of map_claims with status rewarded: {len([mc for mc in self.map_claims if mc.status == "rewarded"])}')
 
     def initialize_verifiers(self):
         num_verifiers = int(len(self.users) * self.num_verifier_ratio)
@@ -101,9 +113,44 @@ class Simulation:
 
 
 if __name__ == '__main__':
-    num_users = 100000
-    num_iterations = 1000
+    num_users = 1000
+    num_iterations = 10000
     num_verifier_ratio = 0.1
 
     simulation = Simulation(num_users, num_iterations, num_verifier_ratio)
     simulation.run_simulation()
+
+    # Collect token data
+    token_data = [user.tokens for user in simulation.users]
+
+    # Create histogram
+    plt.hist(token_data, bins=range(0, max(token_data) + 10, 10))
+    plt.title("Token Distribution Among Users")
+    plt.xlabel("Tokens")
+    plt.ylabel("Number of Users")
+    plt.show()
+
+    # Plot total rewards over time
+    plt.plot(simulation.total_rewards_over_time)
+    plt.title("Total Rewards Over Time")
+    plt.xlabel("Time Step")
+    plt.ylabel("Total Rewards")
+    plt.show()
+
+    # Plot number of contributors and verifiers over time
+    plt.plot(simulation.num_contributors_over_time, label="Contributors")
+    plt.plot(simulation.num_verifiers_over_time, label="Verifiers")
+    plt.title("Number of Contributors and Verifiers Over Time")
+    plt.xlabel("Time Step")
+    plt.ylabel("Number of Users")
+    plt.legend()
+    plt.show()
+
+    # Plot number of flagged users and demotions over time
+    plt.plot(simulation.num_flagged_over_time, label="Flagged Verifiers")
+    plt.plot(simulation.num_demotions_over_time, label="Demotions")
+    plt.title("Number of Flagged Verifiers and Demotions Over Time")
+    plt.xlabel("Iterations")
+    plt.ylabel("Count")
+    plt.legend()  # Display a legend
+    plt.show()
