@@ -1,0 +1,57 @@
+Class User:
+    Initialize id, tokens, map_claims, role, flags
+
+Class MapClaim:
+    Initialize user_id, status
+
+Class Simulation:
+    Initialize num_users, num_iterations, num_verifier_ratio
+
+    Function create_map_claim(user):
+        Create new MapClaim with user_id
+        Add MapClaim to user.map_claims and Simulation.map_claims
+
+    Function auto_validate(map_claim):
+        Set map_claim.status to "verified" with 90% chance, "rejected" otherwise
+
+    Function verify_map_claim(verifier, map_claim):
+        If map_claim.status == "verified" and verifier.id != map_claim.user_id:
+            Set map_claim.status to "rewarded" with 95% chance, "rejected" otherwise
+            If "rewarded", add 10 tokens to map_claim.user_id
+
+    Function flag_verifier(user, verifier):
+        Increment verifier.flags
+        If verifier.flags >= 4:
+            Set verifier.role to "Contributor"
+            Set verifier.tokens to 0
+
+    Function initialize_verifiers():
+            Select random sample of users
+            For each user in sample:
+                Set user.role to "Verifier"
+
+    Function run_simulation():
+        Initialize_verifiers()
+
+        For each iteration:
+            Select random user and random action based on probabilities
+            If action == "create":
+                Create and auto_validate a map_claim
+
+            If action == "flag" and user is eligible:
+                Select random verifier and call flag_verifier(user, verifier)
+
+            Select random verifier and random action based on probabilities
+            If action == "check" and there are map_claims:
+                Select random map_claim and verify_map_claim(verifier, map_claim)
+
+            If action == "create":
+                Create and auto_validate a map_claim
+
+            If user.tokens > threshold and user.role == "Contributor":
+                Promote user to "Verifier"
+
+            Update simulation metrics
+
+    run_simulation()
+    Print simulation metrics
